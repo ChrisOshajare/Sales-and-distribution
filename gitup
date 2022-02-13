@@ -1,0 +1,106 @@
+ EXPLORATION 1 
+ 
+ Trying to find the relationship between the customer contacted minimum of 10 times through direct channel and their total spending.
+ This is achieve by: 
+ Using the events table to find information regarding companies (accounts) that were contacted minimum of 10 times via direct channel 
+ at any time in 2016 and then which of these accounts are the top 20 spending.
+ 
+ SELECT acc.name, web.channel, COUNT (web.channel) AS no_time_contacted, 
+ 		SUM (ord.total_amt_usd) AS total_sum_spent
+ FROM web_events web
+ JOIN accounts acc
+ ON web.account_id = acc.id
+ JOIN orders AS ord
+ ON acc.id = ord.account_id
+ WHERE web.channel = 'direct' AND CAST(web.occurred_at AS varchar) like '%2016%'
+ GROUP BY 1,2
+ ORDER BY 4 DESC
+ LIMIT 20;
+ 
+ EXPLORATION 2
+ 
+ I need the categorization of customers based on their total amount of purchases. The categorisation should:
+ Top level when total sales of all orders is greater than $200,000;
+ Middle level includes customers (accounts) with sales between $200,000 and $100,000 and
+ Lowest level is accounts under $100,000 sales orders.
+ I provide the account name, the total sales of all orders for the customer,
+ and the level. Top spending customers are listed first.
+ 
+ 
+SELECT acc.name,  SUM (ord.total) AS qty_ordered, SUM (ord.total_amt_usd) AS total_sales,
+	  CASE WHEN SUM(ord.total_amt_usd) > 200000 THEN 'Top Level'
+	  WHEN SUM(ord.total_amt_usd) BETWEEN 100000 and 200000 THEN 'Middle Level'
+	  ELSE 'Lowest Level' END AS customer_level
+FROM accounts AS acc
+JOIN orders AS ord
+ON acc.id = ord.account_id
+GROUP BY 1
+ORDER BY 3 DESC;
+  
+ EXPLORATION 3
+ 
+I explore the database to determine the top performing sales representatives and their regions based on the number of orders 
+they generated. Top performers are those with minimum of 100000 orders generated while others are not top performers.
+
+SELECT sale.name, rg.name AS region_name, SUM (ord.total) AS ordered_qty,
+	   CASE WHEN SUM (ord.total) >= 100000 THEN 'Top Performer'
+	   ELSE 'Not' END AS sales_reps_performance
+FROM orders AS ord
+JOIN accounts AS acc
+ON ord.account_id = acc.id
+JOIN sales_reps AS sale
+ON acc.sales_rep_id = sale.id
+JOIN region AS rg
+ON sale.region_id = rg.id
+GROUP BY 1,2
+ORDER BY 3 DESC;
+
+
+EXPLORATION 4
+
+The sales reps above only factored in the order quantity, some representatives might have less order counts but higher sales volume.
+Therefore, the following stratification is used to assess reps performance:
+Those with minimum of 100000 order quantity and more than 10000000 in total sales as top performers;
+Those between 50000 and 100000 orders and between 5000000 and 10000000 in sales as middle;
+others are low performers.
+
+SELECT sale.name, rg.name AS region_name, SUM (ord.total) AS ordered_qty, SUM (ord.total_amt_usd) AS total_sales,
+	   CASE WHEN SUM (ord.total) >= 100000 OR SUM (ord.total_amt_usd) >= 1000000 THEN 'Top Performer'
+	   WHEN SUM (ord.total) BETWEEN 50000 AND 100000
+	   OR SUM (ord.total_amt_usd) >= 500000 AND SUM (ord.total_amt_usd) < 1000000 THEN 'Middle Performer'
+	   ELSE 'Not' END AS sales_reps_performance
+FROM orders AS ord
+JOIN accounts AS acc
+ON ord.account_id = acc.id
+JOIN sales_reps AS sale
+ON acc.sales_rep_id = sale.id
+JOIN region AS rg
+ON sale.region_id = rg.id
+GROUP BY 1,2
+ORDER BY 4 DESC;
+
+
+EXPLORATION 5
+
+This drills down on the best performing customer based on total amount spent,
+showing the number of events the customer have by each channel?
+
+SELECT COUNT (web.channel) AS no_of_events, acc.name, web.channel
+FROM web_events AS web
+JOIN accounts AS acc
+ON web.account_id = acc.id
+WHERE acc.name = (SELECT name
+				  FROM				  
+				  (SELECT SUM (ord.total_amt_usd),acc.name 
+				  from orders AS ord
+				  JOIN accounts AS acc
+				  ON ord.account_id = acc.id 
+				  GROUP BY 2
+                  ORDER BY 1 desc 
+				  LIMIT 1) AS sub1)
+GROUP BY 2, 3
+ORDER BY 1 desc;
+
+
+
+
